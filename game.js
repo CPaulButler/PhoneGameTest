@@ -157,7 +157,8 @@ function handleMotion(event) {
         // Map device orientation to canvas coordinates
         // Different devices/browsers may have different orientations
         // These values are calibrated for typical portrait orientation
-        accelerationX = accel.x ? accel.x * ACCELERATION_MULTIPLIER : 0;
+        // Note: X-axis is negated to match expected left/right tilt behavior
+        accelerationX = accel.x ? -accel.x * ACCELERATION_MULTIPLIER : 0;
         accelerationY = accel.y ? accel.y * ACCELERATION_MULTIPLIER : GRAVITY;
         
         // TODO: Detect device orientation and adjust axis mapping accordingly
