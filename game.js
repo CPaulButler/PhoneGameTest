@@ -3,6 +3,14 @@ const BOUNCE_EFFICIENCY = 0.9;
 const BALL_RADIUS = 20;
 const GRAVITY = 0.5;
 const FRICTION = 0.99;
+const ACCELERATION_MULTIPLIER = 0.1;
+
+// Sound effect constants
+const BOINK_START_FREQ = 400;
+const BOINK_END_FREQ = 100;
+const BOINK_DURATION = 0.1;
+const BOINK_GAIN = 0.3;
+const BOINK_END_GAIN = 0.01;
 
 // Game state
 let canvas, ctx;
@@ -16,6 +24,7 @@ let ball = {
 let gameRunning = false;
 let accelerationX = 0;
 let accelerationY = GRAVITY;
+let motionListenerActive = false;
 
 // Audio context for sound effects
 let audioContext;
@@ -59,6 +68,8 @@ function resizeCanvas() {
 }
 
 function initAudio() {
+    // Note: AudioContext is created here but will be resumed in startGame
+    // after user interaction to comply with browser autoplay policies
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
         createBoinkSound();
@@ -79,14 +90,14 @@ function createBoinkSound() {
         gainNode.connect(audioContext.destination);
         
         // Boink sound: quick descending tone
-        oscillator.frequency.setValueAtTime(400, audioContext.currentTime);
-        oscillator.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.1);
+        oscillator.frequency.setValueAtTime(BOINK_START_FREQ, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(BOINK_END_FREQ, audioContext.currentTime + BOINK_DURATION);
         
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(BOINK_GAIN, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(BOINK_END_GAIN, audioContext.currentTime + BOINK_DURATION);
         
         oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.1);
+        oscillator.stop(audioContext.currentTime + BOINK_DURATION);
     };
 }
 
@@ -123,7 +134,10 @@ async function startGame() {
     }
     
     // Start listening to device motion
-    window.addEventListener('devicemotion', handleMotion);
+    if (!motionListenerActive) {
+        window.addEventListener('devicemotion', handleMotion);
+        motionListenerActive = true;
+    }
     
     gameRunning = true;
     startBtn.style.display = 'none';
@@ -143,11 +157,11 @@ function handleMotion(event) {
         // Map device orientation to canvas coordinates
         // Different devices/browsers may have different orientations
         // These values are calibrated for typical portrait orientation
-        accelerationX = accel.x ? accel.x * 0.1 : 0;
-        accelerationY = accel.y ? accel.y * 0.1 : GRAVITY;
+        accelerationX = accel.x ? accel.x * ACCELERATION_MULTIPLIER : 0;
+        accelerationY = accel.y ? accel.y * ACCELERATION_MULTIPLIER : GRAVITY;
         
-        // If device is in landscape, you might need to swap x and y
-        // This is a simplified approach - production code would detect orientation
+        // TODO: Detect device orientation and adjust axis mapping accordingly
+        // In landscape mode, x and y axes may need to be swapped
     }
 }
 
