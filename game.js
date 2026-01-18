@@ -523,7 +523,7 @@ function updateBall(ball, ballIndex) {
     let isInStickyCorner = false;
     
     for (let spot of stickySpots) {
-        if (!spot.isOuterCorner) continue;
+        if (!spot.isCorner) continue;
         
         const dx = ball.x - spot.x;
         const dy = ball.y - spot.y;
@@ -569,7 +569,7 @@ function updateBall(ball, ballIndex) {
     
     // Check capture state for all corner spots
     for (let spot of stickySpots) {
-        if (!spot.isCorner) continue;
+        if (!spot.isOuterCorner) continue;
         
         const dx = ball.x - spot.x;
         const dy = ball.y - spot.y;
