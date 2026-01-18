@@ -6,7 +6,7 @@ const FRICTION = 0.99;
 const ACCELERATION_MULTIPLIER = 0.3; // Increased for better sensitivity
 const STICKY_RADIUS = 30;
 const STICKY_STRENGTH = 0.92; // How much velocity is dampened in sticky spots (higher = less sticky)
-const STICKY_ESCAPE_THRESHOLD = 0.8; // Minimum tilt force needed to escape sticky zone (simulates climbing out of a dent)
+const STICKY_ESCAPE_THRESHOLD = 0.5; // Minimum tilt force needed to escape sticky zone (simulates climbing out of a dent)
 const BOUNCE_THRESHOLD = 2; // Minimum bounce velocity to play sound
 const CORNER_CAPTURE_THRESHOLD = 2.5; // Max velocity to be captured in corner
 const CORNER_CAPTURE_RADIUS_FACTOR = 0.5; // Multiplier for sticky radius to determine capture zone
@@ -104,7 +104,7 @@ function initStickySpots() {
     const h = canvas.height;
     
     // Center sticky spot (where quadrants meet)
-    stickySpots.push({ x: w / 2, y: h / 2, isCorner: false });
+    stickySpots.push({ x: w / 2, y: h / 2, isCorner: true, index: 4 });
     
     // Four outside corner sticky spots
     stickySpots.push({ x: 0, y: 0, isCorner: true, index: 0 }); // Top-left
