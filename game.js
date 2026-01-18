@@ -411,7 +411,6 @@ function isNearCorner(ball, corner) {
 function updateBall(ball, ballIndex) {
     // Check if ball is in a sticky corner BEFORE applying forces
     let isInStickyCorner = false;
-    let stickySpot = null;
     
     for (let spot of stickySpots) {
         if (!spot.isCorner) continue;
@@ -423,7 +422,6 @@ function updateBall(ball, ballIndex) {
         
         if (isInCorner) {
             isInStickyCorner = true;
-            stickySpot = spot;
             break;
         }
     }
