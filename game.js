@@ -96,6 +96,7 @@ function initBalls() {
     for (let i = 0; i < REQUIRED_CORNERS; i++) {
         cornerCaptureCache[i] = false;
     }
+    cornerCaptureCache[4] = false; // Center corner
 }
 
 function initStickySpots() {
@@ -403,6 +404,9 @@ function isNearCorner(ball, corner) {
     } else if (corner.x === w && corner.y === h) {
         // Bottom-right corner: both x and y should be large
         return ball.x > w - threshold && ball.y > h - threshold;
+    } else if (corner.x === w / 2 && corner.y === h / 2) {
+        // Center corner (inner quadrant corners): ball should be near center
+        return Math.abs(ball.x - w / 2) < threshold && Math.abs(ball.y - h / 2) < threshold;
     }
     
     return false;
