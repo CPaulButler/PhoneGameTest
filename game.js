@@ -10,6 +10,7 @@ const BOUNCE_THRESHOLD = 2; // Minimum bounce velocity to play sound
 const CORNER_CAPTURE_THRESHOLD = 1.5; // Max velocity to be captured in corner
 const CORNER_CAPTURE_RADIUS_FACTOR = 0.5; // Multiplier for sticky radius to determine capture zone
 const REQUIRED_CORNERS = 4; // Number of corners needed to win
+const WALL_THICKNESS = 4; // Thickness of quadrant divider walls
 
 // Sound effect constants
 const BOINK_START_FREQ = 400;
@@ -70,10 +71,10 @@ function initBalls() {
     
     // Create balls, one in each quadrant
     const quadrants = [
-        { x: w * 0.25, y: h * 0.25 }, // Top-left
-        { x: w * 0.75, y: h * 0.25 }, // Top-right
-        { x: w * 0.25, y: h * 0.75 }, // Bottom-left
-        { x: w * 0.75, y: h * 0.75 }  // Bottom-right
+        { x: w * 0.25, y: h * 0.25, quadrant: 0 }, // Top-left
+        { x: w * 0.75, y: h * 0.25, quadrant: 1 }, // Top-right
+        { x: w * 0.25, y: h * 0.75, quadrant: 2 }, // Bottom-left
+        { x: w * 0.75, y: h * 0.75, quadrant: 3 }  // Bottom-right
     ];
     
     for (let i = 0; i < REQUIRED_CORNERS; i++) {
@@ -82,7 +83,8 @@ function initBalls() {
             y: quadrants[i].y,
             vx: 0,
             vy: 0,
-            radius: BALL_RADIUS
+            radius: BALL_RADIUS,
+            quadrant: quadrants[i].quadrant // Track which quadrant this ball belongs to
         });
         ballStates.push({ captured: false, cornerIndex: -1 });
     }
@@ -362,37 +364,72 @@ function updateBall(ball, ballIndex) {
     ball.x += ball.vx;
     ball.y += ball.vy;
     
-    // Collision detection with boundaries
+    // Get quadrant boundaries based on ball's quadrant
+    const halfWidth = canvas.width / 2;
+    const halfHeight = canvas.height / 2;
+    const wallHalf = WALL_THICKNESS / 2;
+    
+    let minX, maxX, minY, maxY;
+    
+    // Set boundaries based on quadrant
+    switch (ball.quadrant) {
+        case 0: // Top-left
+            minX = 0;
+            maxX = halfWidth - wallHalf;
+            minY = 0;
+            maxY = halfHeight - wallHalf;
+            break;
+        case 1: // Top-right
+            minX = halfWidth + wallHalf;
+            maxX = canvas.width;
+            minY = 0;
+            maxY = halfHeight - wallHalf;
+            break;
+        case 2: // Bottom-left
+            minX = 0;
+            maxX = halfWidth - wallHalf;
+            minY = halfHeight + wallHalf;
+            maxY = canvas.height;
+            break;
+        case 3: // Bottom-right
+            minX = halfWidth + wallHalf;
+            maxX = canvas.width;
+            minY = halfHeight + wallHalf;
+            maxY = canvas.height;
+            break;
+    }
+    
+    // Collision detection with boundaries (including quadrant walls)
     let bounced = false;
     let bounceVelocity = 0;
     
-    // Left boundary
-    if (ball.x - ball.radius < 0) {
-        ball.x = ball.radius;
+    // Left boundary (outer wall or center wall)
+    if (ball.x - ball.radius < minX) {
+        ball.x = minX + ball.radius;
         bounceVelocity = Math.abs(ball.vx);
         ball.vx = -ball.vx * BOUNCE_EFFICIENCY;
         bounced = true;
     }
     
-    // Right boundary
-    if (ball.x + ball.radius > canvas.width) {
-        ball.x = canvas.width - ball.radius;
+    // Right boundary (outer wall or center wall)
+    if (ball.x + ball.radius > maxX) {
+        ball.x = maxX - ball.radius;
         bounceVelocity = Math.abs(ball.vx);
         ball.vx = -ball.vx * BOUNCE_EFFICIENCY;
         bounced = true;
     }
     
-    // Top boundary
-    if (ball.y - ball.radius < 0) {
-        ball.y = ball.radius;
+    // Top boundary (outer wall or center wall)
+    if (ball.y - ball.radius < minY) {
+        ball.y = minY + ball.radius;
         bounceVelocity = Math.abs(ball.vy);
         ball.vy = -ball.vy * BOUNCE_EFFICIENCY;
         bounced = true;
     }
     
-    // Bottom boundary
-    if (ball.y + ball.radius > canvas.height) {
-        ball.y = canvas.height - ball.radius;
+    // Bottom boundary (outer wall or center wall)
+    if (ball.y + ball.radius > maxY) {
+        ball.y = maxY - ball.radius;
         bounceVelocity = Math.abs(ball.vy);
         ball.vy = -ball.vy * BOUNCE_EFFICIENCY;
         bounced = true;
@@ -433,24 +470,18 @@ function draw() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw quadrant dividers
-    ctx.strokeStyle = '#cccccc';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]);
+    // Draw quadrant dividing walls (solid)
+    const halfWidth = canvas.width / 2;
+    const halfHeight = canvas.height / 2;
+    const wallHalf = WALL_THICKNESS / 2;
     
-    // Vertical divider
-    ctx.beginPath();
-    ctx.moveTo(canvas.width / 2, 0);
-    ctx.lineTo(canvas.width / 2, canvas.height);
-    ctx.stroke();
+    ctx.fillStyle = '#333333';
     
-    // Horizontal divider
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height / 2);
-    ctx.lineTo(canvas.width, canvas.height / 2);
-    ctx.stroke();
+    // Vertical wall
+    ctx.fillRect(halfWidth - wallHalf, 0, WALL_THICKNESS, canvas.height);
     
-    ctx.setLineDash([]);
+    // Horizontal wall
+    ctx.fillRect(0, halfHeight - wallHalf, canvas.width, WALL_THICKNESS);
     
     // Draw sticky spots
     for (let spot of stickySpots) {
