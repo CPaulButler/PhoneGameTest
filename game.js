@@ -1,7 +1,7 @@
 // Game constants
 const BOUNCE_EFFICIENCY = 0.9;
 const BALL_RADIUS = 15;
-const GRAVITY = 0.0;
+const GRAVITY = 0.5;
 const FRICTION = 0.99;
 const ACCELERATION_MULTIPLIER = 0.3; // Increased for better sensitivity
 const STICKY_RADIUS = 30;
@@ -128,13 +128,13 @@ function initStickySpots() {
     const h = canvas.height;
     
     // Center sticky spot (where quadrants meet)
-    stickySpots.push({ x: w / 2, y: h / 2, isCorner: true, index: 4 });
+    stickySpots.push({ x: w / 2, y: h / 2, isCorner: true, isOuterCorner: false, index: 4 });
     
     // Four outside corner sticky spots
-    stickySpots.push({ x: 0, y: 0, isCorner: true, index: 0 }); // Top-left
-    stickySpots.push({ x: w, y: 0, isCorner: true, index: 1 }); // Top-right
-    stickySpots.push({ x: 0, y: h, isCorner: true, index: 2 }); // Bottom-left
-    stickySpots.push({ x: w, y: h, isCorner: true, index: 3 }); // Bottom-right
+    stickySpots.push({ x: 0, y: 0, isCorner: true, isOuterCorner: true, index: 0 }); // Top-left
+    stickySpots.push({ x: w, y: 0, isCorner: true, isOuterCorner: true, index: 1 }); // Top-right
+    stickySpots.push({ x: 0, y: h, isCorner: true, isOuterCorner: true, index: 2 }); // Bottom-left
+    stickySpots.push({ x: w, y: h, isCorner: true, isOuterCorner: true, index: 3 }); // Bottom-right
 }
 
 function resizeCanvas() {
@@ -523,7 +523,7 @@ function updateBall(ball, ballIndex) {
     let isInStickyCorner = false;
     
     for (let spot of stickySpots) {
-        if (!spot.isCorner) continue;
+        if (!spot.isOuterCorner) continue;
         
         const dx = ball.x - spot.x;
         const dy = ball.y - spot.y;
@@ -778,7 +778,7 @@ function draw() {
         ctx.beginPath();
         ctx.arc(spot.x, spot.y, STICKY_RADIUS, 0, Math.PI * 2);
         
-        if (spot.isCorner) {
+        if (spot.isOuterCorner) {
             // Use cached result for whether this corner has a captured ball
             const hasCapturedBall = cornerCaptureCache[spot.index] || false;
             ctx.fillStyle = hasCapturedBall 
@@ -790,7 +790,7 @@ function draw() {
         ctx.fill();
         
         // Draw border
-        ctx.strokeStyle = spot.isCorner ? '#FF9800' : '#9E9E9E';
+        ctx.strokeStyle = spot.isOuterCorner ? '#FF9800' : '#9E9E9E';
         ctx.lineWidth = 2;
         ctx.stroke();
     }
