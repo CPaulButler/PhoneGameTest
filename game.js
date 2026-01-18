@@ -20,6 +20,23 @@ const BOINK_DURATION = 0.1;
 const BOINK_GAIN = 0.3;
 const BOINK_END_GAIN = 0.01;
 
+const TADA_GAIN_1 = 0.2;
+const TADA_GAIN_2 = 0.3;
+const TADA_END_GAIN = 0.01;
+const TADA_CHORD_1_START = 0;
+const TADA_CHORD_1_END = 0.15;
+const TADA_CHORD_2_START = 0.15;
+const TADA_CHORD_2_END = 0.4;
+
+const WAHWAH_GAIN = 0.15;
+const WAHWAH_END_GAIN = 0.01;
+const WAHWAH_NOTE_1_START = 0;
+const WAHWAH_NOTE_1_END = 0.15;
+const WAHWAH_NOTE_2_START = 0.15;
+const WAHWAH_NOTE_2_END = 0.3;
+const WAHWAH_NOTE_3_START = 0.3;
+const WAHWAH_NOTE_3_END = 0.5;
+
 // Game state
 let canvas, ctx;
 let balls = [];
@@ -175,27 +192,47 @@ function createTadaSound() {
     tadaSound = function() {
         if (!audioContext) return;
         
-        const oscillator1 = audioContext.createOscillator();
-        const oscillator2 = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
+        const now = audioContext.currentTime;
         
-        oscillator1.connect(gainNode);
-        oscillator2.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        // First chord (C + E)
+        const osc1a = audioContext.createOscillator();
+        const osc1b = audioContext.createOscillator();
+        const gain1 = audioContext.createGain();
         
-        // Ta-da: ascending notes
-        oscillator1.frequency.setValueAtTime(523, audioContext.currentTime); // C
-        oscillator1.frequency.setValueAtTime(659, audioContext.currentTime + 0.15); // E
-        oscillator2.frequency.setValueAtTime(659, audioContext.currentTime); // E
-        oscillator2.frequency.setValueAtTime(784, audioContext.currentTime + 0.15); // G
+        osc1a.connect(gain1);
+        osc1b.connect(gain1);
+        gain1.connect(audioContext.destination);
         
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        osc1a.frequency.setValueAtTime(523, now + TADA_CHORD_1_START); // C
+        osc1b.frequency.setValueAtTime(659, now + TADA_CHORD_1_START); // E
         
-        oscillator1.start(audioContext.currentTime);
-        oscillator1.stop(audioContext.currentTime + 0.3);
-        oscillator2.start(audioContext.currentTime);
-        oscillator2.stop(audioContext.currentTime + 0.3);
+        gain1.gain.setValueAtTime(TADA_GAIN_1, now + TADA_CHORD_1_START);
+        gain1.gain.exponentialRampToValueAtTime(TADA_END_GAIN, now + TADA_CHORD_1_END);
+        
+        osc1a.start(now + TADA_CHORD_1_START);
+        osc1a.stop(now + TADA_CHORD_1_END);
+        osc1b.start(now + TADA_CHORD_1_START);
+        osc1b.stop(now + TADA_CHORD_1_END);
+        
+        // Second chord (E + G)
+        const osc2a = audioContext.createOscillator();
+        const osc2b = audioContext.createOscillator();
+        const gain2 = audioContext.createGain();
+        
+        osc2a.connect(gain2);
+        osc2b.connect(gain2);
+        gain2.connect(audioContext.destination);
+        
+        osc2a.frequency.setValueAtTime(659, now + TADA_CHORD_2_START); // E
+        osc2b.frequency.setValueAtTime(784, now + TADA_CHORD_2_START); // G
+        
+        gain2.gain.setValueAtTime(TADA_GAIN_2, now + TADA_CHORD_2_START);
+        gain2.gain.exponentialRampToValueAtTime(TADA_END_GAIN, now + TADA_CHORD_2_END);
+        
+        osc2a.start(now + TADA_CHORD_2_START);
+        osc2a.stop(now + TADA_CHORD_2_END);
+        osc2b.start(now + TADA_CHORD_2_START);
+        osc2b.stop(now + TADA_CHORD_2_END);
     };
 }
 
@@ -204,22 +241,52 @@ function createWahwahSound() {
     wahwahSound = function() {
         if (!audioContext) return;
         
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
+        const now = audioContext.currentTime;
         
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        // First note (A)
+        const osc1 = audioContext.createOscillator();
+        const gain1 = audioContext.createGain();
         
-        // Wah-wah: descending sad notes
-        oscillator.frequency.setValueAtTime(440, audioContext.currentTime); // A
-        oscillator.frequency.setValueAtTime(415, audioContext.currentTime + 0.15); // G#
-        oscillator.frequency.setValueAtTime(392, audioContext.currentTime + 0.3); // G
+        osc1.connect(gain1);
+        gain1.connect(audioContext.destination);
         
-        gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+        osc1.frequency.setValueAtTime(440, now + WAHWAH_NOTE_1_START); // A
         
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.4);
+        gain1.gain.setValueAtTime(WAHWAH_GAIN, now + WAHWAH_NOTE_1_START);
+        gain1.gain.exponentialRampToValueAtTime(WAHWAH_END_GAIN, now + WAHWAH_NOTE_1_END);
+        
+        osc1.start(now + WAHWAH_NOTE_1_START);
+        osc1.stop(now + WAHWAH_NOTE_1_END);
+        
+        // Second note (G#)
+        const osc2 = audioContext.createOscillator();
+        const gain2 = audioContext.createGain();
+        
+        osc2.connect(gain2);
+        gain2.connect(audioContext.destination);
+        
+        osc2.frequency.setValueAtTime(415, now + WAHWAH_NOTE_2_START); // G#
+        
+        gain2.gain.setValueAtTime(WAHWAH_GAIN, now + WAHWAH_NOTE_2_START);
+        gain2.gain.exponentialRampToValueAtTime(WAHWAH_END_GAIN, now + WAHWAH_NOTE_2_END);
+        
+        osc2.start(now + WAHWAH_NOTE_2_START);
+        osc2.stop(now + WAHWAH_NOTE_2_END);
+        
+        // Third note (G)
+        const osc3 = audioContext.createOscillator();
+        const gain3 = audioContext.createGain();
+        
+        osc3.connect(gain3);
+        gain3.connect(audioContext.destination);
+        
+        osc3.frequency.setValueAtTime(392, now + WAHWAH_NOTE_3_START); // G
+        
+        gain3.gain.setValueAtTime(WAHWAH_GAIN, now + WAHWAH_NOTE_3_START);
+        gain3.gain.exponentialRampToValueAtTime(WAHWAH_END_GAIN, now + WAHWAH_NOTE_3_END);
+        
+        osc3.start(now + WAHWAH_NOTE_3_START);
+        osc3.stop(now + WAHWAH_NOTE_3_END);
     };
 }
 
