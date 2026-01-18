@@ -581,7 +581,7 @@ function updateBall(ball, ballIndex) {
             const velocity = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
             const wasCapture = ballStates[ballIndex].captured;
             const isNowCaptured = velocity < CORNER_CAPTURE_THRESHOLD
-                && edgeDist < STICKY_RADIUS * CORNER_CAPTURE_RADIUS_FACTOR;
+                && isInCorner;
             
             if (isNowCaptured && !wasCapture) {
                 // Ball just got captured
