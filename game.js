@@ -8,6 +8,8 @@ const STICKY_RADIUS = 30;
 const STICKY_STRENGTH = 0.85; // How much velocity is dampened in sticky spots
 const BOUNCE_THRESHOLD = 2; // Minimum bounce velocity to play sound
 const CORNER_CAPTURE_THRESHOLD = 1.5; // Max velocity to be captured in corner
+const CORNER_CAPTURE_RADIUS_FACTOR = 0.5; // Multiplier for sticky radius to determine capture zone
+const REQUIRED_CORNERS = 4; // Number of corners needed to win
 
 // Sound effect constants
 const BOINK_START_FREQ = 400;
@@ -25,6 +27,7 @@ let accelerationY = GRAVITY;
 let motionListenerActive = false;
 let stickySpots = [];
 let ballStates = []; // Track if balls are captured in corners
+let cornerCaptureCache = {}; // Cache for which corners have captured balls
 
 // Audio context for sound effects
 let audioContext;
@@ -61,6 +64,7 @@ function init() {
 function initBalls() {
     balls = [];
     ballStates = [];
+    cornerCaptureCache = {};
     const w = canvas.width;
     const h = canvas.height;
     
@@ -81,6 +85,11 @@ function initBalls() {
             radius: BALL_RADIUS
         });
         ballStates.push({ captured: false, cornerIndex: -1 });
+    }
+    
+    // Initialize corner capture cache
+    for (let i = 0; i < REQUIRED_CORNERS; i++) {
+        cornerCaptureCache[i] = false;
     }
 }
 
@@ -325,22 +334,25 @@ function updateBall(ball, ballIndex) {
             if (spot.isCorner) {
                 const velocity = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
                 const wasCapture = ballStates[ballIndex].captured;
-                const isNowCaptured = velocity < CORNER_CAPTURE_THRESHOLD && dist < STICKY_RADIUS * 0.5;
+                const isNowCaptured = velocity < CORNER_CAPTURE_THRESHOLD && dist < STICKY_RADIUS * CORNER_CAPTURE_RADIUS_FACTOR;
                 
                 if (isNowCaptured && !wasCapture) {
                     // Ball just got captured
                     ballStates[ballIndex].captured = true;
                     ballStates[ballIndex].cornerIndex = spot.index;
+                    cornerCaptureCache[spot.index] = true;
                     playTada();
                 } else if (!isNowCaptured && wasCapture && ballStates[ballIndex].cornerIndex === spot.index) {
                     // Ball just escaped
                     ballStates[ballIndex].captured = false;
                     ballStates[ballIndex].cornerIndex = -1;
+                    cornerCaptureCache[spot.index] = false;
                     playWahwah();
                 } else if (isNowCaptured) {
                     // Still captured
                     ballStates[ballIndex].captured = true;
                     ballStates[ballIndex].cornerIndex = spot.index;
+                    cornerCaptureCache[spot.index] = true;
                 }
             }
         }
@@ -393,15 +405,15 @@ function updateBall(ball, ballIndex) {
 }
 
 function checkWinCondition() {
-    // Check if all 4 balls are captured in different corners
-    if (ballStates.length !== 4) return;
+    // Check if all balls are captured in different corners
+    if (ballStates.length !== REQUIRED_CORNERS) return;
     
     const allCaptured = ballStates.every(state => state.captured);
     
     if (allCaptured) {
         // Check that all corners have a ball
         const cornerSet = new Set(ballStates.map(state => state.cornerIndex));
-        if (cornerSet.size === 4) {
+        if (cornerSet.size === REQUIRED_CORNERS) {
             // Win condition met!
             gameRunning = false;
             const status = document.getElementById('status');
@@ -446,10 +458,8 @@ function draw() {
         ctx.arc(spot.x, spot.y, STICKY_RADIUS, 0, Math.PI * 2);
         
         if (spot.isCorner) {
-            // Check if this corner has a captured ball
-            const hasCapturedBall = ballStates.some(state => 
-                state.captured && state.cornerIndex === spot.index
-            );
+            // Use cached result for whether this corner has a captured ball
+            const hasCapturedBall = cornerCaptureCache[spot.index] || false;
             ctx.fillStyle = hasCapturedBall 
                 ? 'rgba(76, 175, 80, 0.3)' // Green if captured
                 : 'rgba(255, 152, 0, 0.2)'; // Orange for corners
