@@ -397,6 +397,14 @@ function updateBall(ball, ballIndex) {
             minY = halfHeight + wallHalf;
             maxY = canvas.height;
             break;
+        default:
+            // Fallback to top-left quadrant if invalid quadrant
+            console.warn('Invalid quadrant:', ball.quadrant);
+            minX = 0;
+            maxX = halfWidth - wallHalf;
+            minY = 0;
+            maxY = halfHeight - wallHalf;
+            break;
     }
     
     // Collision detection with boundaries (including quadrant walls)
