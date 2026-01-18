@@ -3,11 +3,11 @@ const BOUNCE_EFFICIENCY = 0.9;
 const BALL_RADIUS = 15;
 const GRAVITY = 0.5;
 const FRICTION = 0.99;
-const ACCELERATION_MULTIPLIER = 0.1;
+const ACCELERATION_MULTIPLIER = 0.3; // Increased for better sensitivity
 const STICKY_RADIUS = 30;
-const STICKY_STRENGTH = 0.85; // How much velocity is dampened in sticky spots
+const STICKY_STRENGTH = 0.92; // How much velocity is dampened in sticky spots (higher = less sticky)
 const BOUNCE_THRESHOLD = 2; // Minimum bounce velocity to play sound
-const CORNER_CAPTURE_THRESHOLD = 1.5; // Max velocity to be captured in corner
+const CORNER_CAPTURE_THRESHOLD = 2.5; // Max velocity to be captured in corner
 const CORNER_CAPTURE_RADIUS_FACTOR = 0.5; // Multiplier for sticky radius to determine capture zone
 const REQUIRED_CORNERS = 4; // Number of corners needed to win
 const WALL_THICKNESS = 4; // Thickness of quadrant divider walls
@@ -26,6 +26,8 @@ let gameRunning = false;
 let accelerationX = 0;
 let accelerationY = GRAVITY;
 let motionListenerActive = false;
+let motionActive = false; // Track if device motion is actually working
+let keyboardActive = false;
 let stickySpots = [];
 let ballStates = []; // Track if balls are captured in corners
 let cornerCaptureCache = {}; // Cache for which corners have captured balls
@@ -272,11 +274,16 @@ async function startGame() {
         motionListenerActive = true;
     }
     
+    // Add keyboard controls for testing
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    
     gameRunning = true;
     startBtn.style.display = 'none';
-    status.textContent = 'Tilt to move balls into all 4 corners!';
+    status.textContent = 'Tilt to move balls into all 4 corners! (or use arrow keys)';
     status.style.fontSize = '14px';
     status.style.fontWeight = 'normal';
+    status.style.color = '#666';
     
     // Start game loop
     gameLoop();
@@ -288,16 +295,79 @@ function handleMotion(event) {
     // Get acceleration data
     const accel = event.accelerationIncludingGravity;
     
-    if (accel) {
+    if (accel && accel.x !== null && accel.y !== null) {
+        motionActive = true;
+        
         // Map device orientation to canvas coordinates
         // Different devices/browsers may have different orientations
         // These values are calibrated for typical portrait orientation
         // Note: X-axis is negated to match expected left/right tilt behavior
-        accelerationX = accel.x ? -accel.x * ACCELERATION_MULTIPLIER : 0;
-        accelerationY = accel.y ? accel.y * ACCELERATION_MULTIPLIER : GRAVITY;
+        accelerationX = -accel.x * ACCELERATION_MULTIPLIER;
+        accelerationY = accel.y * ACCELERATION_MULTIPLIER;
         
-        // TODO: Detect device orientation and adjust axis mapping accordingly
-        // In landscape mode, x and y axes may need to be swapped
+        // Debug output
+        if (Math.random() < 0.01) { // Log only 1% of the time to avoid spam
+            console.log(`Motion: x=${accel.x.toFixed(2)}, y=${accel.y.toFixed(2)}, z=${accel.z ? accel.z.toFixed(2) : 'N/A'}`);
+            console.log(`Applied: accX=${accelerationX.toFixed(2)}, accY=${accelerationY.toFixed(2)}`);
+        }
+        
+        // Update status to show motion is working
+        updateMotionStatus();
+    } else {
+        motionActive = false;
+    }
+}
+
+function updateMotionStatus() {
+    const status = document.getElementById('status');
+    if (motionActive) {
+        status.style.color = '#4CAF50'; // Green when motion is active
+    } else if (keyboardActive) {
+        status.style.color = '#2196F3'; // Blue for keyboard
+    }
+}
+
+function handleKeyDown(event) {
+    if (!gameRunning) return;
+    
+    keyboardActive = true;
+    const keyForce = 1.0;
+    
+    switch(event.key) {
+        case 'ArrowLeft':
+            accelerationX = -keyForce;
+            event.preventDefault();
+            break;
+        case 'ArrowRight':
+            accelerationX = keyForce;
+            event.preventDefault();
+            break;
+        case 'ArrowUp':
+            accelerationY = -keyForce;
+            event.preventDefault();
+            break;
+        case 'ArrowDown':
+            accelerationY = keyForce;
+            event.preventDefault();
+            break;
+    }
+    updateMotionStatus();
+}
+
+function handleKeyUp(event) {
+    if (!gameRunning) return;
+    
+    switch(event.key) {
+        case 'ArrowLeft':
+        case 'ArrowRight':
+            if (!motionActive) accelerationX = 0;
+            event.preventDefault();
+            break;
+        case 'ArrowUp':
+        case 'ArrowDown':
+            if (!motionActive) accelerationY = GRAVITY;
+            event.preventDefault();
+            break;
     }
 }
 
@@ -313,6 +383,30 @@ function update() {
     checkWinCondition();
 }
 
+// Helper function to check if ball is actually near a corner (not just along a wall)
+function isNearCorner(ball, corner) {
+    const threshold = STICKY_RADIUS;
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    // For each corner, check if ball is within the corner region (not just along one wall)
+    if (corner.x === 0 && corner.y === 0) {
+        // Top-left corner: both x and y should be small
+        return ball.x < threshold && ball.y < threshold;
+    } else if (corner.x === w && corner.y === 0) {
+        // Top-right corner: x should be large, y should be small
+        return ball.x > w - threshold && ball.y < threshold;
+    } else if (corner.x === 0 && corner.y === h) {
+        // Bottom-left corner: x should be small, y should be large
+        return ball.x < threshold && ball.y > h - threshold;
+    } else if (corner.x === w && corner.y === h) {
+        // Bottom-right corner: both x and y should be large
+        return ball.x > w - threshold && ball.y > h - threshold;
+    }
+    
+    return false;
+}
+
 function updateBall(ball, ballIndex) {
     // Apply acceleration (gravity + device motion)
     ball.vx += accelerationX;
@@ -322,41 +416,51 @@ function updateBall(ball, ballIndex) {
     ball.vx *= FRICTION;
     ball.vy *= FRICTION;
     
-    // Check sticky spots and apply dampening
+    // Check sticky spots and apply dampening (only for corners)
     for (let spot of stickySpots) {
+        // Skip non-corner spots (like center) or apply dampening only within corners
+        if (!spot.isCorner) continue;
+        
         const dx = ball.x - spot.x;
         const dy = ball.y - spot.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         
-        if (dist < STICKY_RADIUS) {
+        // Only apply dampening if ball is actually in the corner region
+        // Check both distance and that ball is actually near the corner (not just along wall)
+        const isInCorner = dist < STICKY_RADIUS && isNearCorner(ball, spot);
+        
+        if (isInCorner) {
             ball.vx *= STICKY_STRENGTH;
             ball.vy *= STICKY_STRENGTH;
             
-            // Check if ball is captured in a corner
-            if (spot.isCorner) {
-                const velocity = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
-                const wasCapture = ballStates[ballIndex].captured;
-                const isNowCaptured = velocity < CORNER_CAPTURE_THRESHOLD && dist < STICKY_RADIUS * CORNER_CAPTURE_RADIUS_FACTOR;
-                
-                if (isNowCaptured && !wasCapture) {
-                    // Ball just got captured
-                    ballStates[ballIndex].captured = true;
-                    ballStates[ballIndex].cornerIndex = spot.index;
-                    cornerCaptureCache[spot.index] = true;
-                    playTada();
-                } else if (!isNowCaptured && wasCapture && ballStates[ballIndex].cornerIndex === spot.index) {
-                    // Ball just escaped
-                    ballStates[ballIndex].captured = false;
-                    ballStates[ballIndex].cornerIndex = -1;
-                    cornerCaptureCache[spot.index] = false;
-                    playWahwah();
-                } else if (isNowCaptured) {
-                    // Still captured
-                    ballStates[ballIndex].captured = true;
-                    ballStates[ballIndex].cornerIndex = spot.index;
-                    cornerCaptureCache[spot.index] = true;
-                }
+            const velocity = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+            const wasCapture = ballStates[ballIndex].captured;
+            const isNowCaptured = velocity < CORNER_CAPTURE_THRESHOLD && dist < STICKY_RADIUS * CORNER_CAPTURE_RADIUS_FACTOR;
+            
+            if (isNowCaptured && !wasCapture) {
+                // Ball just got captured
+                ballStates[ballIndex].captured = true;
+                ballStates[ballIndex].cornerIndex = spot.index;
+                cornerCaptureCache[spot.index] = true;
+                playTada();
+            } else if (!isNowCaptured && wasCapture && ballStates[ballIndex].cornerIndex === spot.index) {
+                // Ball just escaped
+                ballStates[ballIndex].captured = false;
+                ballStates[ballIndex].cornerIndex = -1;
+                cornerCaptureCache[spot.index] = false;
+                playWahwah();
+            } else if (isNowCaptured) {
+                // Still captured
+                ballStates[ballIndex].captured = true;
+                ballStates[ballIndex].cornerIndex = spot.index;
+                cornerCaptureCache[spot.index] = true;
             }
+        } else if (ballStates[ballIndex].captured && ballStates[ballIndex].cornerIndex === spot.index) {
+            // Ball has moved away from corner - it escaped
+            ballStates[ballIndex].captured = false;
+            ballStates[ballIndex].cornerIndex = -1;
+            cornerCaptureCache[spot.index] = false;
+            playWahwah();
         }
     }
     
