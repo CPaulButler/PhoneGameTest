@@ -44,3 +44,12 @@ python3 -m http.server 8080
 - Modern mobile browsers (Chrome, Safari, Firefox)
 - Desktop browsers (limited to gravity only without device motion)
 - Requires Web Audio API support for sound effects
+
+### Updates and Cache Busting
+
+The game uses versioned query parameters (e.g., `game.js?v=2`) to ensure browsers load the latest version of the game files. When deploying updates:
+
+1. Increment the version number in `index.html` for both `styles.css?v=X` and `game.js?v=X`
+2. The HTML file includes meta tags to prevent caching, ensuring users always get the latest version
+
+This prevents mobile browsers from serving stale cached versions after updates.
