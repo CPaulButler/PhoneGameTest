@@ -6,6 +6,7 @@ const FRICTION = 0.99;
 const ACCELERATION_MULTIPLIER = 0.3; // Increased for better sensitivity
 const STICKY_RADIUS = 30;
 const STICKY_STRENGTH = 0.92; // How much velocity is dampened in sticky spots (higher = less sticky)
+const STICKY_ESCAPE_THRESHOLD = 0.8; // Minimum tilt force needed to escape sticky zone (simulates climbing out of a dent)
 const BOUNCE_THRESHOLD = 2; // Minimum bounce velocity to play sound
 const CORNER_CAPTURE_THRESHOLD = 2.5; // Max velocity to be captured in corner
 const CORNER_CAPTURE_RADIUS_FACTOR = 0.5; // Multiplier for sticky radius to determine capture zone
@@ -430,8 +431,20 @@ function updateBall(ball, ballIndex) {
         const isInCorner = dist < STICKY_RADIUS && isNearCorner(ball, spot);
         
         if (isInCorner) {
-            ball.vx *= STICKY_STRENGTH;
-            ball.vy *= STICKY_STRENGTH;
+            // Calculate the total applied force (tilt magnitude)
+            const appliedForce = Math.sqrt(accelerationX * accelerationX + accelerationY * accelerationY);
+            
+            // If the applied force is below the escape threshold, hold the ball completely still
+            // This simulates a dent in the floor that holds the ball until sufficient tilt
+            if (appliedForce < STICKY_ESCAPE_THRESHOLD) {
+                // Hold the ball completely still - set velocity to zero
+                ball.vx = 0;
+                ball.vy = 0;
+            } else {
+                // Applied force exceeds threshold, allow movement but with dampening
+                ball.vx *= STICKY_STRENGTH;
+                ball.vy *= STICKY_STRENGTH;
+            }
             
             const velocity = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
             const wasCapture = ballStates[ballIndex].captured;
