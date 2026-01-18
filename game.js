@@ -1,7 +1,7 @@
 // Game constants
 const BOUNCE_EFFICIENCY = 0.9;
 const BALL_RADIUS = 15;
-const GRAVITY = 0.5;
+const GRAVITY = 0.0;
 const FRICTION = 0.99;
 const ACCELERATION_MULTIPLIER = 0.3; // Increased for better sensitivity
 const STICKY_RADIUS = 30;
@@ -31,12 +31,18 @@ let keyboardActive = false;
 let stickySpots = [];
 let ballStates = []; // Track if balls are captured in corners
 let cornerCaptureCache = {}; // Cache for which corners have captured balls
+let winFlashActive = false;
+let winFlashTimer = null;
+let winFlashIndex = 0;
+let winFlashUntil = 0;
+const WIN_FLASH_COLORS = ['#ff5252', '#ffeb3b', '#69f0ae', '#40c4ff', '#b388ff'];
 
 // Audio context for sound effects
 let audioContext;
 let boinkSound;
 let tadaSound;
 let wahwahSound;
+let winTuneSound;
 
 // Initialize the game
 function init() {
@@ -135,6 +141,7 @@ function initAudio() {
         createBoinkSound();
         createTadaSound();
         createWahwahSound();
+        createWinTuneSound();
     } catch (e) {
         console.warn('Web Audio API not supported:', e);
     }
@@ -240,6 +247,37 @@ function playWahwah() {
     }
 }
 
+function createWinTuneSound() {
+    winTuneSound = function() {
+        if (!audioContext) return;
+
+        const now = audioContext.currentTime;
+        const gainNode = audioContext.createGain();
+        gainNode.connect(audioContext.destination);
+        gainNode.gain.setValueAtTime(0.25, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+        const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 659.25]; // C5 E5 G5 C6 G5 E5
+        const duration = 0.12;
+
+        notes.forEach((freq, index) => {
+            const osc = audioContext.createOscillator();
+            osc.type = 'triangle';
+            osc.connect(gainNode);
+            const start = now + index * duration;
+            osc.frequency.setValueAtTime(freq, start);
+            osc.start(start);
+            osc.stop(start + duration);
+        });
+    };
+}
+
+function playWinTune() {
+    if (winTuneSound) {
+        winTuneSound();
+    }
+}
+
 async function startGame() {
     const status = document.getElementById('status');
     const startBtn = document.getElementById('startBtn');
@@ -247,6 +285,7 @@ async function startGame() {
     // Reset game state
     initBalls();
     gameRunning = false;
+    stopWinFlash();
     
     // Request device motion permission (required for iOS 13+)
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
@@ -424,10 +463,11 @@ function updateBall(ball, ballIndex) {
         const dx = ball.x - spot.x;
         const dy = ball.y - spot.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
+        const edgeDist = Math.max(0, dist - ball.radius);
         
         // Only apply dampening if ball is actually in the corner region
-        // Check both distance and that ball is actually near the corner (not just along wall)
-        const isInCorner = dist < STICKY_RADIUS && isNearCorner(ball, spot);
+        // Check both distance from the ball's edge and that ball is actually near the corner (not just along wall)
+        const isInCorner = edgeDist < STICKY_RADIUS && isNearCorner(ball, spot);
         
         if (isInCorner) {
             ball.vx *= STICKY_STRENGTH;
@@ -435,7 +475,8 @@ function updateBall(ball, ballIndex) {
             
             const velocity = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
             const wasCapture = ballStates[ballIndex].captured;
-            const isNowCaptured = velocity < CORNER_CAPTURE_THRESHOLD && dist < STICKY_RADIUS * CORNER_CAPTURE_RADIUS_FACTOR;
+            const isNowCaptured = velocity < CORNER_CAPTURE_THRESHOLD
+                && edgeDist < STICKY_RADIUS * CORNER_CAPTURE_RADIUS_FACTOR;
             
             if (isNowCaptured && !wasCapture) {
                 // Ball just got captured
@@ -563,18 +604,50 @@ function checkWinCondition() {
         // Check that all corners have a ball
         const cornerSet = new Set(ballStates.map(state => state.cornerIndex));
         if (cornerSet.size === REQUIRED_CORNERS) {
-            // Win condition met!
-            gameRunning = false;
-            const status = document.getElementById('status');
-            status.textContent = '🎉 YOU WIN! All balls captured! 🎉';
-            status.style.fontSize = '24px';
-            status.style.fontWeight = 'bold';
-            
-            // Show restart button
-            const startBtn = document.getElementById('startBtn');
-            startBtn.textContent = 'Play Again';
-            startBtn.style.display = 'block';
+            handleWin();
         }
+    }
+}
+
+function handleWin() {
+    if (!gameRunning) return;
+    // Win condition met!
+    gameRunning = false;
+    playWinTune();
+    startWinFlash();
+    const status = document.getElementById('status');
+    status.textContent = '🎉 YOU WIN! All balls captured! 🎉';
+    status.style.fontSize = '24px';
+    status.style.fontWeight = 'bold';
+    status.style.color = '#333';
+
+    // Show restart button
+    const startBtn = document.getElementById('startBtn');
+    startBtn.textContent = 'Start Game';
+    startBtn.style.display = 'block';
+}
+
+function startWinFlash() {
+    stopWinFlash();
+    winFlashActive = true;
+    winFlashIndex = 0;
+    winFlashUntil = Date.now() + 2200;
+    winFlashTimer = setInterval(() => {
+        if (Date.now() > winFlashUntil) {
+            stopWinFlash();
+            draw();
+            return;
+        }
+        winFlashIndex = (winFlashIndex + 1) % WIN_FLASH_COLORS.length;
+        draw();
+    }, 120);
+}
+
+function stopWinFlash() {
+    winFlashActive = false;
+    if (winFlashTimer) {
+        clearInterval(winFlashTimer);
+        winFlashTimer = null;
     }
 }
 
@@ -620,6 +693,14 @@ function draw() {
     // Draw all balls
     for (let ball of balls) {
         drawBall(ball);
+    }
+
+    if (winFlashActive) {
+        ctx.save();
+        ctx.globalAlpha = 0.35;
+        ctx.fillStyle = WIN_FLASH_COLORS[winFlashIndex];
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
     }
 }
 
