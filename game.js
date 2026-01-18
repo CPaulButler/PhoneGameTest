@@ -68,7 +68,7 @@ function initBalls() {
     const w = canvas.width;
     const h = canvas.height;
     
-    // Create 4 balls, one in each quadrant
+    // Create balls, one in each quadrant
     const quadrants = [
         { x: w * 0.25, y: h * 0.25 }, // Top-left
         { x: w * 0.75, y: h * 0.25 }, // Top-right
@@ -76,7 +76,7 @@ function initBalls() {
         { x: w * 0.75, y: h * 0.75 }  // Bottom-right
     ];
     
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < REQUIRED_CORNERS; i++) {
         balls.push({
             x: quadrants[i].x,
             y: quadrants[i].y,
